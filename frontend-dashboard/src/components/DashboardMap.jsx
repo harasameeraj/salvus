@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Circle, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet-routing-machine';
 
 // Fix typical Leaflet invisible icon issues in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -33,6 +34,54 @@ const getDisasterColor = (typeStr) => {
     return '#ef4444'; // fallback red
 };
 
+function RoutingControl({ targetLoc }) {
+    const map = useMap();
+    useEffect(() => {
+        if (!targetLoc) return;
+
+        // Mock fire station 3km inland from victim (minus longitude moves it West)
+        const fireStation = L.latLng(targetLoc.lat + 0.02, targetLoc.lng - 0.04);
+        const victim = L.latLng(targetLoc.lat, targetLoc.lng);
+
+        const routingControl = L.Routing.control({
+            waypoints: [
+                fireStation,
+                victim
+            ],
+            lineOptions: {
+                styles: [{ color: '#3b82f6', weight: 6, opacity: 0.8 }] // Blue line for responders
+            },
+            show: false, // Don't show the text itinerary by default to save screen space
+            addWaypoints: false,
+            routeWhileDragging: false,
+            fitSelectedRoutes: false,
+            createMarker: function (i, wp, nWps) {
+                if (i === 0) {
+                    // Fire Station marker
+                    return L.marker(wp.latLng, {
+                        icon: L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                        })
+                    }).bindPopup("<div class='font-bold text-blue-600'>Primary Rescue Station</div><div class='text-xs'>Units Deploying</div>");
+                }
+                return null; // Victim marker is already drawn by SOS
+            }
+        }).addTo(map);
+
+        return () => {
+            if (routingControl && map) {
+                try { map.removeControl(routingControl); } catch (e) { }
+            }
+        };
+    }, [map, targetLoc?.lat, targetLoc?.lng]); // re-run only if coordinates actually change
+
+    return null;
+}
+
 function MapController({ center }) {
     const map = useMap();
     useEffect(() => {
@@ -46,6 +95,11 @@ function MapController({ center }) {
 export default function DashboardMap({ incidents = [], reports = [] }) {
     const mapCenter = incidents.length > 0 ? [incidents[0].location_lat, incidents[0].location_lng] : DEFAULT_CENTER;
 
+    // Find the latest target location for routing
+    const targetLoc = reports.length > 0
+        ? { lat: reports[0].location_lat, lng: reports[0].location_lng }
+        : (incidents.length > 0 ? { lat: incidents[0].location_lat, lng: incidents[0].location_lng } : null);
+
     return (
         <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-gray-800 relative z-0">
             <MapContainer
@@ -54,6 +108,7 @@ export default function DashboardMap({ incidents = [], reports = [] }) {
                 style={{ height: '100%', width: '100%' }}
             >
                 <MapController center={mapCenter} />
+                <RoutingControl targetLoc={targetLoc} />
                 {/* Dark mode tiles suitable for Operations centers */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"

@@ -1,15 +1,14 @@
 import os
 import json
-from google import genai
-from google.genai import types
+import openai
 from pydantic import BaseModel
 from typing import List, Dict, Any
 
 # Ensure we don't crash if API key is not present initially
-api_key = os.environ.get("GEMINI_API_KEY", "")
-client = genai.Client(api_key=api_key) if api_key else None
+api_key = os.environ.get("OPENAI_API_KEY", "")
+client = openai.AsyncOpenAI(api_key=api_key) if api_key else None
 # Use a fast and efficient model
-MODEL_ID = 'gemini-2.5-flash'
+MODEL_ID = 'gpt-4o-mini'
 
 class RiskPredictionSchema(BaseModel):
     predicted_disaster_type: str
@@ -99,16 +98,17 @@ async def _generate(prompt: str, schema: BaseModel) -> Any:
         return schema(**stub_data)
         
     try:
-        response = await client.aio.models.generate_content(
+        response = await client.beta.chat.completions.parse(
             model=MODEL_ID,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-            ),
+            messages=[
+                {"role": "system", "content": "You are a crisis management AI. Analyze the incoming disaster signals and provide strictly formatted operational intelligence."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format=schema,
         )
+        return response.choices[0].message.parsed
     except Exception as e:
-        print(f"Gemini AI Generation Error (Rate Limit/Quota): {e}")
+        print(f"OpenAI Generation Error (Rate Limit/Quota): {e}")
         # Return graceful stub if API is temporarily banned
         stub_data = {}
         for k, v in schema.model_fields.items():
@@ -121,14 +121,6 @@ async def _generate(prompt: str, schema: BaseModel) -> Any:
             else:
                 stub_data[k] = "System Cohort Limit Reached: Regenerating shortly..."
         return schema(**stub_data)
-
-    # Parse JSON text to dict then to Pydantic
-    try:
-        return schema.model_validate_json(response.text)
-    except Exception:
-        # Fallback if invalid format
-        raw_dict = json.loads(response.text)
-        return schema(**raw_dict)
 
 # 1. Risk Prediction and Scoring
 async def generate_risk_score(signals: List[dict]) -> RiskPredictionSchema:
