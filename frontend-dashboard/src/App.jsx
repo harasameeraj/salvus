@@ -31,7 +31,8 @@ function App() {
   const handleTriggerEmergency = async () => {
     setIsTriggering(true);
     try {
-      const res = await fetch('http://localhost:8000/api/incidents', {
+      const API_BASE = `http://${window.location.hostname}:8000`;
+      const res = await fetch(`${API_BASE}/api/incidents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,16 +54,18 @@ function App() {
     }
   };
 
+  const API_BASE = `http://${window.location.hostname}:8000`;
+
   React.useEffect(() => {
     const fetchLiveData = () => {
       // Fetch active incidents
-      fetch('http://localhost:8000/api/incidents')
+      fetch(`${API_BASE}/api/incidents`)
         .then(res => res.json())
         .then(data => setIncidents(data))
         .catch(err => console.error("Error fetching incidents:", err));
 
       // Fetch emergency reports 
-      fetch('http://localhost:8000/api/reports')
+      fetch(`${API_BASE}/api/reports`)
         .then(res => res.json())
         .then(data => setReports(data))
         .catch(err => console.error("Error fetching reports:", err));
@@ -76,7 +79,7 @@ function App() {
   // Fetch AI Intelligence Briefs Only Once Per Incident to avoid AI Rate Limits
   React.useEffect(() => {
     // 1. Fetch Global Executive State Summary
-    fetch('http://localhost:8000/api/dashboard-state')
+    fetch(`${API_BASE}/api/dashboard-state`)
       .then(res => res.json())
       .then(data => setDashboardState(data))
       .catch(err => console.error("Error fetching dashboard state:", err));
@@ -84,7 +87,7 @@ function App() {
     // 2. Fetch Dispatch Recommendation for Primary Incident
     if (incidents.length > 0) {
       const primaryId = incidents[0].id;
-      fetch(`http://localhost:8000/api/incidents/${primaryId}/recommendation`)
+      fetch(`${API_BASE}/api/incidents/${primaryId}/recommendation`)
         .then(res => {
           if (!res.ok) throw new Error('API Rate Limited or error');
           return res.json();
@@ -115,8 +118,8 @@ function App() {
             onClick={handleTriggerEmergency}
             disabled={isTriggering}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${isTriggering
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)] active:scale-95'
+              ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+              : 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)] active:scale-95'
               }`}
           >
             <AlertTriangle className={`w-4 h-4 ${isTriggering ? '' : 'animate-bounce'}`} />

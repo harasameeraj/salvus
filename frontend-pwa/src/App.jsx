@@ -24,10 +24,12 @@ function App() {
     };
   }, []);
 
+  const API_BASE = `http://${window.location.hostname}:8000`;
+
   useEffect(() => {
     const fetchLiveData = () => {
-      if (!isOnline) return;
-      fetch('http://localhost:8000/api/incidents')
+      if (!effectiveOnlineStatus) return;
+      fetch(`${API_BASE}/api/incidents`)
         .then(res => res.json())
         .then(data => {
           if (data.length > 0) {
@@ -47,8 +49,8 @@ function App() {
   }, [isOnline]);
 
   useEffect(() => {
-    if (!isOnline || !currentIncident?.id) return;
-    fetch('http://localhost:8000/api/dashboard-state')
+    if (!effectiveOnlineStatus || !currentIncident?.id) return;
+    fetch(`${API_BASE}/api/dashboard-state`)
       .then(res => res.json())
       .then(data => {
         if (data.executive_briefing) {
@@ -86,7 +88,7 @@ function App() {
 
   const sendReport = async (lat, lng) => {
     try {
-      await fetch('http://localhost:8000/api/reports', {
+      await fetch(`${API_BASE}/api/reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -171,9 +173,9 @@ function App() {
           onClick={handleEmergencyReport}
           disabled={reportState !== 'idle'}
           className={`w-full rounded-2xl py-4 flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 ${!effectiveOnlineStatus ? 'bg-gray-900 shadow-2xl text-white border-2 border-red-500/30' :
-              reportState === 'idle'
-                ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-500/30 shadow-xl text-white'
-                : 'bg-gray-100 text-gray-400'
+            reportState === 'idle'
+              ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-500/30 shadow-xl text-white'
+              : 'bg-gray-100 text-gray-400'
             }`}
         >
           {!effectiveOnlineStatus ? (
