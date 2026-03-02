@@ -26,7 +26,7 @@ jobs:
 
       - name: Generate Android Workspace
         working-directory: ./frontend-mobile
-        run: flutter create --platforms android .
+        run: flutter create --platforms android --name crisissync_mobile --overwrite .
 
       - name: Configure Android Permissions
         working-directory: ./frontend-mobile
