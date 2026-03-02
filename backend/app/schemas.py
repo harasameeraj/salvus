@@ -19,6 +19,16 @@ class EmergencyReportCreate(BaseModel):
     location_lat: float
     location_lng: float
     description: Optional[str] = None
+    medium: Optional[str] = "internet"
+
+class IncidentCreate(BaseModel):
+    disaster_type: str
+    location_name: str
+    location_lat: float
+    location_lng: float
+    severity: str
+    population_affected: int
+    status: Optional[str] = "active"
 
 class IncidentResponse(BaseModel):
     id: int

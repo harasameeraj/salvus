@@ -1,15 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, MapPin, ShieldAlert, PhoneCall } from 'lucide-react';
+import { AlertTriangle, MapPin, ShieldAlert, PhoneCall, WifiOff, MessageSquare } from 'lucide-react';
 import CivilianMap from './components/Map';
 
 function App() {
-  const [reportState, setReportState] = useState('idle'); // idle, sending, received
+  const [reportState, setReportState] = useState('idle');
   const [currentSeverity, setCurrentSeverity] = useState('low');
   const [currentIncident, setCurrentIncident] = useState(null);
   const [aiExplanation, setAiExplanation] = useState('');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSimulatingOffline, setIsSimulatingOffline] = useState(false);
+  const [p2pActive, setP2PActive] = useState(false);
+
+  const effectiveOnlineStatus = isOnline && !isSimulatingOffline;
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchLiveData = () => {
-      // Fetch incidents to find if there is an active local threat
+      if (!isOnline) return;
       fetch('http://localhost:8000/api/incidents')
         .then(res => res.json())
         .then(data => {
@@ -24,13 +41,13 @@ function App() {
         .catch(err => console.error(err));
     };
 
-    fetchLiveData(); // Initial fetch
-    const intervalId = setInterval(fetchLiveData, 3000); // Poll every 3 seconds
+    fetchLiveData();
+    const intervalId = setInterval(fetchLiveData, 3000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isOnline]);
 
-  // Fetch AI Incident Advisory ONLY when incident changes
   useEffect(() => {
+    if (!isOnline || !currentIncident?.id) return;
     fetch('http://localhost:8000/api/dashboard-state')
       .then(res => res.json())
       .then(data => {
@@ -39,20 +56,32 @@ function App() {
         }
       })
       .catch(err => console.error(err));
-  }, [currentIncident?.id]);
+  }, [currentIncident?.id, isOnline]);
 
   const handleEmergencyReport = () => {
+    if (!effectiveOnlineStatus) {
+      handleOfflineSurvival();
+      return;
+    }
     setReportState('sending');
-
-    // Get actual user location if possible, else mock around Chennai
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => sendReport(position.coords.latitude, position.coords.longitude),
-        () => sendReport(13.05 + Math.random() * 0.02, 80.25 + Math.random() * 0.02) // fallback around chennai with scatter
+        () => sendReport(13.05 + Math.random() * 0.02, 80.25 + Math.random() * 0.02)
       );
     } else {
       sendReport(13.05, 80.25);
     }
+  };
+
+  const handleOfflineSurvival = () => {
+    setP2PActive(true);
+    setTimeout(() => setP2PActive(false), 8000);
+
+    // Multi-tier Fallback 2: SMS Broadcast
+    const phone = "911";
+    const body = `CRITICAL: CrisisSync AI Disaster Report. Last Coords: ${currentIncident ? currentIncident.location_lat : '13.08'},${currentIncident ? currentIncident.location_lng : '80.27'}. No Data. Help!`;
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(body)}`;
   };
 
   const sendReport = async (lat, lng) => {
@@ -64,7 +93,8 @@ function App() {
           user_id: "user_" + Math.random().toString(36).substr(2, 9),
           location_lat: lat,
           location_lng: lng,
-          description: "Emergency distress from PWA"
+          description: "Emergency distress from PWA",
+          medium: "internet"
         })
       });
       setReportState('received');
@@ -77,8 +107,7 @@ function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-50 overflow-hidden relative">
-
-      {/* Top Warning Banner - Only visible if elevated risk */}
+      {/* Top Warning Banner */}
       {currentSeverity !== 'low' && (
         <div className={`w-full p-4 flex flex-col items-start justify-center text-white z-10 shadow-md ${currentSeverity === 'critical' ? 'bg-red-600' :
           currentSeverity === 'high' ? 'bg-orange-500' : 'bg-yellow-500'
@@ -101,8 +130,6 @@ function App() {
       {/* Map Content Layer */}
       <div className="flex-1 relative">
         <CivilianMap severity={currentSeverity} incident={currentIncident} />
-
-        {/* Floating Actions Over Map */}
         <div className="absolute top-4 left-4 z-[400] bg-white/90 backdrop-blur rounded-xl shadow-lg p-3 max-w-[200px]">
           <div className="flex items-center space-x-2 text-gray-700">
             <MapPin className="w-4 h-4 text-blue-500" />
@@ -114,26 +141,63 @@ function App() {
 
       {/* Emergency Report Action Footer */}
       <div className="w-full bg-white p-6 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] z-10 rounded-t-3xl border-t border-gray-100 pb-10">
+
+        {/* Connection Status Badge */}
+        <div className="flex flex-col items-center mb-4 space-y-2">
+          <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center space-x-1 ${effectiveOnlineStatus ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse'
+            }`}>
+            {effectiveOnlineStatus ? <MapPin className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{effectiveOnlineStatus ? 'Network Stable' : 'OFFLINE MODE: NO INTERNET'}</span>
+          </div>
+
+          <button
+            onClick={() => setIsSimulatingOffline(!isSimulatingOffline)}
+            className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter hover:text-red-500 transition-colors"
+          >
+            [DEMO: {isSimulatingOffline ? 'Disable' : 'Enable'} Simulation]
+          </button>
+        </div>
+
+        {p2pActive && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-center flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping" />
+            <p className="text-xs text-blue-600 font-bold uppercase">
+              Broadcasting P2P Signal (WebRTC)...
+            </p>
+          </div>
+        )}
+
         <button
           onClick={handleEmergencyReport}
           disabled={reportState !== 'idle'}
-          className={`w-full rounded-2xl py-4 flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 ${reportState === 'idle'
-            ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-500/30 shadow-xl text-white'
-            : 'bg-gray-100 text-gray-400'
+          className={`w-full rounded-2xl py-4 flex flex-col items-center justify-center space-y-1 transition-all active:scale-95 ${!effectiveOnlineStatus ? 'bg-gray-900 shadow-2xl text-white border-2 border-red-500/30' :
+              reportState === 'idle'
+                ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-red-500/30 shadow-xl text-white'
+                : 'bg-gray-100 text-gray-400'
             }`}
         >
-          {reportState === 'idle' && (
+          {!effectiveOnlineStatus ? (
             <>
-              <ShieldAlert className="w-8 h-8 mb-1" />
-              <span className="font-bold text-xl tracking-tight">REPORT EMERGENCY</span>
-              <span className="text-xs opacity-80 uppercase font-medium">Auto-attaches Location</span>
+              <MessageSquare className="w-8 h-8 mb-1" />
+              <span className="font-bold text-xl uppercase tracking-tighter">BROADCAST SMS SIGNAL</span>
+              <span className="text-[10px] opacity-70 font-medium">SHOUTS LOCATION TO RESPONDERS</span>
             </>
-          )}
-          {reportState === 'sending' && (
-            <span className="font-bold animate-pulse">Transmitting Signal...</span>
-          )}
-          {reportState === 'received' && (
-            <span className="font-bold text-green-600">Help is on the way.</span>
+          ) : (
+            <>
+              {reportState === 'idle' && (
+                <>
+                  <ShieldAlert className="w-8 h-8 mb-1" />
+                  <span className="font-bold text-xl tracking-tight">REPORT EMERGENCY</span>
+                  <span className="text-xs opacity-80 uppercase font-medium">Auto-attaches Location</span>
+                </>
+              )}
+              {reportState === 'sending' && (
+                <span className="font-bold animate-pulse uppercase">Syncing with Command...</span>
+              )}
+              {reportState === 'received' && (
+                <span className="font-bold text-green-600 uppercase">Received. Deploying Units.</span>
+              )}
+            </>
           )}
         </button>
 
@@ -152,7 +216,6 @@ function App() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }

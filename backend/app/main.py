@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import engine, Base, get_db
 from .scheduler import start_scheduler, scheduler
-from .schemas import EmergencyReportCreate
+from .schemas import EmergencyReportCreate, IncidentCreate
+from .services.communication import comm_service
 from .models import Signal, Incident, RiskScore, EmergencyReport
 
 @asynccontextmanager
@@ -110,6 +111,14 @@ async def submit_report(report: EmergencyReportCreate, db: AsyncSession = Depend
     db.add(new_rep)
     await db.commit()
     await db.refresh(new_rep)
+    
+    # SOS LOGIC: alert ONLY the first responder immediately
+    sos_msg = f"URGENT SOS SIGNAL: A citizen needs help at [{new_rep.location_lat}, {new_rep.location_lng}]. Report: {new_rep.description}. Deploy to coordinates now."
+    
+    await comm_service.send_whatsapp_alert("responder", f"🚨 {sos_msg}")
+    await comm_service.send_sms_alert("responder", sos_msg)
+    await comm_service.place_voice_call("responder", f"Emergency Dispatch alert. A survival signal has been triggered by a help seeker. Location is synced to your dashboard. Description is as follows. {new_rep.description}. Respond immediately.")
+    
     return {"status": "success", "report_id": new_rep.id}
 
 @app.get("/api/reports")
@@ -129,3 +138,33 @@ async def sse_generator():
 @app.get("/api/stream")
 async def sse_stream(request: Request):
     return EventSourceResponse(sse_generator())
+
+@app.post("/api/incidents")
+async def create_incident(incident: IncidentCreate, db: AsyncSession = Depends(get_db)):
+    db_incident = Incident(**incident.model_dump())
+    db.add(db_incident)
+    await db.commit()
+    await db.refresh(db_incident)
+    
+    # PREVENTIVE ALERT LOGIC: Different tones for different personas
+    if db_incident.severity.lower() in ["high", "critical"]:
+        # Responder Tone: Operational/Action
+        resp_msg = f"STRATEGIC UPDATE: A {db_incident.disaster_type} is developing in {db_incident.location_name}. Analyze risk heatmap and be ready for deployment."
+        await comm_service.send_whatsapp_alert("responder", f"🛠 {resp_msg}")
+        await comm_service.send_sms_alert("responder", resp_msg)
+        
+        # End User Tone: Safety/Evacuation
+        user_msg = f"SAFETY ALERT: A {db_incident.disaster_type} is active in {db_incident.location_name}. Please move to safe high ground and follow local authority guidance. Stay safe."
+        await comm_service.send_whatsapp_alert("reporter", f"🛡 {user_msg}")
+        await comm_service.send_sms_alert("reporter", user_msg)
+        
+    if db_incident.severity.lower() == "critical":
+        # Voice Tone: Action-oriented for Responders
+        resp_voice = f"Operational alert. A critical {db_incident.disaster_type} has been detected in {db_incident.location_name}. Your dashboard is primed with risk analytics. Be ready to help and take action immediately."
+        await comm_service.place_voice_call("responder", resp_voice)
+
+        # Voice Tone: Safety/Emergency for Victims
+        vict_voice = f"Life safety warning from CrisisSync AI. A {db_incident.disaster_type} is active in your immediate area. This is a critical alert. Be safe and evacuate to a secure location now. Help is being mobilized."
+        await comm_service.place_voice_call("reporter", vict_voice)
+
+    return db_incident

@@ -64,6 +64,7 @@ class EmergencyReport(Base):
     location_lat = Column(Float)
     location_lng = Column(Float)
     description = Column(Text, nullable=True)
+    medium = Column(String, nullable=True)  # internet / sms / p2p
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     is_verified = Column(Boolean, default=False)
     legitimacy_verdict = Column(String, nullable=True) # confirmed / probable / uncertain / likely false
