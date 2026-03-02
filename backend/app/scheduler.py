@@ -26,10 +26,15 @@ async def poll_and_process():
                 logger.warning("No signals fetched")
                 return
             
-            # Save to DB
+            # Save to DB (Ignore duplicates)
             for s in signals:
-                db_signal = Signal(**s.model_dump())
-                db.add(db_signal)
+                try:
+                    db_signal = Signal(**s.model_dump())
+                    db.add(db_signal)
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    continue
             await db.commit()
 
             # 2. Convert mapped signals back to dicts to pass to Gemini
