@@ -28,6 +28,11 @@ jobs:
         working-directory: ./frontend-mobile
         run: flutter create --platforms android .
 
+      - name: Configure Android Permissions
+        working-directory: ./frontend-mobile
+        run: |
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+
       - name: Inject Environment Variables
         working-directory: ./frontend-mobile
         run: |
