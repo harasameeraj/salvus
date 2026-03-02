@@ -7,13 +7,13 @@ cd ..
 # Start frontend dashboard
 cd frontend-dashboard
 npm install
-npm run dev &
+npm run dev -- --host &
 cd ..
 
 # Start frontend PWA
 cd frontend-pwa
 npm install
-npm run dev &
+npm run dev -- --host &
 cd ..
 
 wait
