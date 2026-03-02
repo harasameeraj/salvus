@@ -1,0 +1,36 @@
+name: crisissync_mobile
+description: "A new Flutter project for the CrisisSync AI Civilian interface."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Core Utility
+  http: ^1.2.0
+  geolocator: ^11.0.0
+  lucide_icons: ^0.1.1
+  flutter_spinkit: ^8.0.0
+  
+  # Map Render Engine (Equivalent to react-leaflet)
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  
+  # Configuration Management (No Hardcoding)
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section
+  assets:
+    - .env
