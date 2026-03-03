@@ -5,10 +5,10 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 
 # Ensure we don't crash if API key is not present initially
-api_key = os.environ.get("GEMINI_API_KEY", "")
-client = openai.AsyncOpenAI(api_key=api_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/") if api_key else None
+api_key = os.environ.get("OPENAI_API_KEY", "")
+client = openai.AsyncOpenAI(api_key=api_key) if api_key else None
 # Use a fast and efficient model
-MODEL_ID = 'gemini-1.5-flash'
+MODEL_ID = 'gpt-4o-mini'
 
 class RiskPredictionSchema(BaseModel):
     predicted_disaster_type: str
