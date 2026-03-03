@@ -76,3 +76,4 @@ Icon
 # Database
 backend/test.db
 backend/salvus.db
+backend/crisissync.db
